@@ -1,0 +1,12 @@
+__pycache__/
+*.py[cod]
+.pytest_cache/
+
+# Local third-party binaries and downloaded archives
+/mihomo
+/mihomo.gz
+
+# Runtime state must stay outside the repository
+state.json
+config.yaml
+providers/
