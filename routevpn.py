@@ -521,6 +521,8 @@ def main(argv=None):
     b.add_argument("--listen", default="127.0.0.1"); b.add_argument("--network", choices=["tcp", "udp", "both"], default="tcp")
     b = pp.add_parser("remove"); b.add_argument("name")
     pp.add_parser("list")
+    a = top.add_parser("local-ports", help="локальные порты mihomo (для совместной работы с другими VPN)")
+    a.add_argument("--mixed", type=int); a.add_argument("--controller", type=int); a.add_argument("--dns", type=int)
     a = top.add_parser("render", help="создать конфиг mihomo"); a.add_argument("--proxy-only", action="store_true")
     a = top.add_parser("run", help="запустить mihomo в текущем терминале"); a.add_argument("--proxy-only", action="store_true")
     a = top.add_parser("uplink", help="физический интерфейс для VPN-соединения")
@@ -546,7 +548,17 @@ def main(argv=None):
         import secrets
         state["secret"] = secrets.token_urlsafe(32)
 
-    if args.cmd == "bbp":
+    if args.cmd == "local-ports":
+        selected = local_ports(state)
+        for key in ("mixed", "controller", "dns"):
+            value = getattr(args, key)
+            if value is not None:
+                selected[key] = valid_port(value)
+        local_ports({"local_ports": selected})
+        state["local_ports"] = selected
+        save(root, state)
+        print("Локальные порты:", " ".join(f"{key}={value}" for key, value in selected.items()))
+    elif args.cmd == "bbp":
         if args.op == "list":
             for name, item in state["subscriptions"].items():
                 if item.get("type") == "bbp":

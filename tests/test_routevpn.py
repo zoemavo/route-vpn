@@ -38,6 +38,14 @@ class ConfigTests(unittest.TestCase):
         with self.assertRaises(routevpn.Error):
             routevpn.local_ports({"local_ports":{"mixed":19090}})
 
+    def test_local_ports_command_sets_isolated_mihomo_ports(self):
+        with tempfile.TemporaryDirectory() as directory:
+            routevpn.main(["--state-dir", directory, "local-ports", "--mixed", "17893",
+                           "--controller", "19091", "--dns", "15354"])
+            state = routevpn.load(Path(directory))
+            self.assertEqual(routevpn.local_ports(state),
+                             {"mixed": 17893, "controller": 19091, "dns": 15354})
+
     def test_config_routes_subscription_and_ports(self):
         state = {
             "secret": "test-secret", "active": "sample",

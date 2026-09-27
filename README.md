@@ -75,6 +75,7 @@ cargo build --release -p bbpd -p bbp-edge -p bbpctl
 rvpn bbp local bbp-local --bin-dir /absolute/big-bang-protocol/target/release --no-select
 rvpn bbp list
 rvpn bbp use bbp-local
+rvpn local-ports --mixed 17893 --controller 19091 --dns 15354
 # Остановите прежний rvpn run, затем:
 rvpn run --proxy-only
 # Или вместо proxy-only:
@@ -82,6 +83,8 @@ sudo rvpn run
 ```
 
 RVPN сам запускает edge, bbpd и mihomo после readiness. `--no-select` сохраняет выбор старой подписки. Приватный профиль создаётся без sudo (0700 directory / 0600 files); при sudo run BBP daemons exec'ятся под UID/GID SUDO_USER, не root. Local edge не даёт зарубежный выход и сам по себе не обходит блокировки.
+
+Если выбранные локальные порты заняты другим VPN, задайте свободные значения командой `rvpn local-ports`. При работающем другом TUN используйте `rvpn run --proxy-only`, чтобы проверить BBP через явный локальный proxy, не меняя системные маршруты.
 
 Удалённый backend: `rvpn bbp add NAME /private/client.toml --binary /path/bbpd`, затем `rvpn bbp use NAME`. Старый adapter CLI тоже совместим:
 
