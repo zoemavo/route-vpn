@@ -65,6 +65,48 @@ HTTPS-ссылку клиент скачивает через `curl`, прове
 - строки URI (`vless://`, `vmess://`, `trojan://`, `ss://`, `hysteria2://`, `tuic://`);
 - base64, внутри которого находятся такие URI.
 
+## BigBang Protocol (BBP)
+
+BBP — нативный backend: mihomo используется только для TUN/rules/hotspot, а сетевой туннель до edge — именно BBP. Без сервера можно запустить настоящий localhost edge:
+
+```bash
+# В BigBang repository:
+cargo build --release -p bbpd -p bbp-edge -p bbpctl
+rvpn bbp local bbp-local --bin-dir /absolute/big-bang-protocol/target/release --no-select
+rvpn bbp list
+rvpn bbp use bbp-local
+# Остановите прежний rvpn run, затем:
+rvpn run --proxy-only
+# Или вместо proxy-only:
+sudo rvpn run
+```
+
+RVPN сам запускает edge, bbpd и mihomo после readiness. `--no-select` сохраняет выбор старой подписки. Приватный профиль создаётся без sudo (0700 directory / 0600 files); при sudo run BBP daemons exec'ятся под UID/GID SUDO_USER, не root. Local edge не даёт зарубежный выход и сам по себе не обходит блокировки.
+
+Удалённый backend: `rvpn bbp add NAME /private/client.toml --binary /path/bbpd`, затем `rvpn bbp use NAME`. Старый adapter CLI тоже совместим:
+
+```bash
+rvpn sub add-bbp private-bbp /path/to/bbpd.toml \
+  --binary /path/to/bbpd \
+  --socks 127.0.0.1:17891
+rvpn sub use private-bbp
+sudo rvpn run
+```
+
+SOCKS только loopback (`127.0.0.1:17891`); authenticated status — `127.0.0.1:17892`. Старые mixed/API/DNS порты сохранены. Одна Session владеет QUIC + authenticated H2 attach. Пользовательские hostnames разрешаются только edge DNS. TLS name/chain проверяются; secrets не логируются.
+
+Runtime теперь соединён. Используется только rvpn0, без второго TUN. Ранние process DIRECT rules и edge IP exclusions предотвращают loop; `rvpn uplink` привязывает carrier sockets к физическому интерфейсу (ошибка — fail closed). Co-located edge также получает DIRECT rule и uplink binding egress. VPN group не содержит DIRECT fallback. Падение bbpd/edge/session останавливает mihomo/TUN; shutdown bounded с kill backstop. Hotspot nft guard не менялся.
+
+UDP ASSOCIATE использует BBP DATAGRAM без retransmission: payload до 1100 байт, восемь destinations/association, 30s idle timeout. Runtime ограничен 64 active streams/contexts, 1024 lifetime stream IDs; после исчерпания — restart RVPN для новой Session. При потере QUIC текущие streams продолжаются на H2, без автоматического reattach. `rvpn status` показывает backend, edge, connected/degraded/disconnected, paths/RTT и proxy.
+
+Deployment/TLS/systemd/rollback: [BigBang live deployment](https://github.com/zoemavo/big-bang-protocol/blob/main/packaging/LIVE_DEPLOYMENT.md). Opt-in настоящий process integration test, без host TUN изменений и без subscription exit:
+
+```bash
+BBP_BIN_DIR=/absolute/big-bang-protocol/target/release python3 -m unittest discover -s tests -v
+```
+
+Тест запускает настоящие mihomo/bbpd/edge на isolated ports, передаёт HTTP через BBP и проверяет SIGTERM/reaping. BigBang native test также проверяет 512 KiB transfer с односторонним QUIC disconnect и UDP echo через surviving H2. Опциональный state.local_ports позволяет изолировать тесты; старый state.json сохраняет прежние defaults.
+
 ## Узлы и состояние
 
 ```bash
@@ -182,7 +224,7 @@ rvpn nodes | wc -l
 
 ## Зависимости
 
-- Python 3 и PyYAML
+- Python 3.11+ и PyYAML (BBP profiles используют стандартный tomllib)
 - mihomo в `PATH` или исполняемый файл `mihomo` в каталоге проекта
 - Для точки доступа: iwd (отдельный Wi-Fi адаптер) или hostapd (виртуальный AP), dnsmasq, nftables, iproute2
 
